@@ -28,6 +28,7 @@ indexer = None
 tester = None
 
 answer_cache = {}
+answer_cache.clear()
 CACHE_MAX_SIZE = 200
 
 # ---------- Функции для извлечения лучшего предложения с весами ----------
@@ -84,11 +85,15 @@ def build_answer_from_results(results, question, indexer) -> str:
     best_data = {"score": -1.0, "sentence": "", "page": None}
 
     for page_num, chunk_idx, chunk_text, _ in results:
+        # Нормализуем пробелы в чанке
+        chunk_text = ' '.join(chunk_text.split())
         sentences = split_into_sentences(chunk_text)
         if not sentences:
             continue
 
         for sent in sentences:
+            # Нормализуем пробелы в предложении
+            sent = ' '.join(sent.split())
             sent_emb = indexer.model.encode(sent, convert_to_numpy=True).astype(np.float32)
             cosine = np.dot(q_emb, sent_emb) / (np.linalg.norm(q_emb) * np.linalg.norm(sent_emb))
             bonus = get_definition_bonus(sent, question)
@@ -102,9 +107,9 @@ def build_answer_from_results(results, question, indexer) -> str:
     if best_data["sentence"] and best_data["score"] > 0.4:
         return f"[Стр. {best_data['page']}] {best_data['sentence']}"
     else:
-        # fallback: первый чанк целиком
         first = results[0]
-        return f"[Стр. {first[0]}]\n{first[2][:500]}..."
+        clean_text = ' '.join(first[2].split())
+        return f"[Стр. {first[0]}]\n{clean_text[:500]}..."
 
 # ---------- Инициализация ----------
 def init_rag():

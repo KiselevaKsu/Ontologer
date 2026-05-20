@@ -1,0 +1,8 @@
+*.pdf
+*.gguf
+*.db
+*.index
+*.meta
+__pycache__/
+flask_session/
+.DS_Store

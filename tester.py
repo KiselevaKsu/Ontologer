@@ -27,7 +27,7 @@ class TestingModule:
         indexer: PDFVectorIndexer,
         db_path: str = "testing.db",
         questions_per_session: int = 5,
-        similarity_threshold: float = 0.8,
+        similarity_threshold: float = 0.87,
         embedding_model_name: str = "intfloat/multilingual-e5-large"
     ):
         self.indexer = indexer
@@ -240,21 +240,27 @@ class TestingModule:
         """
         if not student_answer.strip():
             return 0.0, "Ответ пустой."
+        
+        # Проверка на "пустые" ответы
+        empty_answers = ['не знаю', 'незнаю', 'хз', 'не помню', 'забыл', 'skip', 'пропустить', 'нет']
+        if student_answer.lower().strip() in empty_answers or len(student_answer.split()) < 3:
+            return 0.0, "Не знаете ответ."
 
         # Эмбеддинг ответа студента
         student_emb = self.embedding_model.encode(student_answer, convert_to_numpy=True).astype(np.float32)
         expected_emb = question.expected_embedding
 
         sim = self._cosine_similarity(student_emb, expected_emb)
+        if sim < 0.5: 
+            return 0.0, f"Слишком низкое сходство ({sim:.2%}), ответ не по теме."
         if sim >= self.similarity_threshold:
             score = 1.0
             feedback = f"Правильно! Сходство с эталоном: {sim:.2%}"
         else:
             score = 0.0
-            feedback = f"Неверно. Сходство с эталоном: {sim:.2%} (нужно ≥ {self.similarity_threshold:.0%})"
+            feedback = f"Неверно. Сходство с эталоном: {sim:.2%} "
 
         return score, feedback
-
     def get_questions_from_pool(self, n: int) -> List[Question]:
         if n > len(self._static_question_pool):
             n = len(self._static_question_pool)

@@ -33,17 +33,19 @@
             justify-content: space-between;
             align-items: center;
             color: white;
+            flex-wrap: wrap;
+            gap: 10px;
         }
-        .header h1 { font-size: 22px; }
+        .header h1 { font-size: 20px; }
         .mode-switch {
             display: flex;
-            gap: 10px;
+            gap: 5px;
             background: rgba(0,0,0,0.2);
             padding: 5px;
             border-radius: 30px;
         }
         .mode-btn {
-            padding: 8px 20px;
+            padding: 8px 15px;
             border-radius: 25px;
             border: none;
             background: transparent;
@@ -51,7 +53,8 @@
             font-weight: bold;
             cursor: pointer;
             transition: 0.3s;
-            font-size: 14px;
+            font-size: 13px;
+            white-space: nowrap;
         }
         .mode-btn.active {
             background: white;
@@ -99,9 +102,11 @@
             display: flex;
             gap: 10px;
             border-top: 1px solid #2d2d44;
+            flex-wrap: wrap;
         }
         .input-area input {
             flex: 1;
+            min-width: 200px;
             padding: 15px;
             border-radius: 30px;
             border: none;
@@ -114,18 +119,16 @@
         .input-area input:focus { border-color: #e94560; }
         .input-area input::placeholder { color: #888; }
         .input-area button {
-            padding: 15px 30px;
+            padding: 15px 25px;
             border-radius: 30px;
             border: none;
             background: linear-gradient(135deg, #e94560 0%, #533483 100%);
             color: white;
             font-weight: bold;
             cursor: pointer;
+            white-space: nowrap;
         }
-        .input-area button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
+        .input-area button:disabled { opacity: 0.5; cursor: not-allowed; }
         .loading {
             display: inline-block;
             width: 20px;
@@ -144,30 +147,32 @@
             font-size: 14px;
             border-bottom: 1px solid #3a3a5c;
         }
-        .score-badge {
-            background: #e94560;
-            padding: 3px 10px;
+        .test-controls {
+            display: flex;
+            gap: 10px;
+            padding: 10px 20px;
+            background: #16213e;
+            justify-content: center;
+            border-top: 1px solid #2d2d44;
+        }
+        .test-btn {
+            padding: 8px 20px;
             border-radius: 20px;
-            font-size: 12px;
-            margin-left: 10px;
-        }
-        .feedback-block {
-            background: #2d2d44;
-            padding: 10px 15px;
-            border-radius: 10px;
-            margin: 10px 0;
-            color: #ccc;
-            font-size: 14px;
-        }
-        .restart-btn {
+            border: none;
             background: #533483;
             color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 25px;
             cursor: pointer;
-            margin: 10px auto;
-            display: block;
+            font-size: 13px;
+        }
+        .copy-btn {
+            background: #2d6a4f;
+            margin-left: 5px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 11px;
         }
     </style>
 </head>
@@ -183,33 +188,42 @@
     
     <div class="progress-bar" id="progressBar" style="display: none;"></div>
     
-    <div class="chat-messages" id="chatMessages">
+    <!-- Два независимых чата -->
+    <div class="chat-messages" id="consultChat">
         <div class="message message-bot">
-            <div class="message-bubble bot-bubble">
-                Привет! Выберите режим.<br>
-                • Консультация — задайте вопрос по учебнику<br>
-                • Тестирование — проверьте свои знания
-            </div>
+            <div class="message-bubble bot-bubble">Режим консультации. Задайте вопрос по учебнику.</div>
+        </div>
+    </div>
+    <div class="chat-messages" id="testChat" style="display: none;">
+        <div class="message message-bot">
+            <div class="message-bubble bot-bubble">Режим тестирования. Нажмите "Начать тест".</div>
         </div>
     </div>
     
-    <div class="input-area">
+    <div class="input-area" id="inputArea">
         <input type="text" id="mainInput" placeholder="Задайте вопрос..." />
-        <button id="sendButton">➤</button>
+        <button id="sendButton">Отправить</button>
+    </div>
+    
+    <div class="test-controls" id="testControls" style="display: none;">
+        <button class="test-btn" id="startTestBtn">Начать тест</button>
     </div>
 </div>
 
 <script>
-    // Состояние приложения
     let currentMode = 'consult';
     let testSessionId = null;
     let isWaiting = false;
     
-    const chatMessages = document.getElementById('chatMessages');
+    const consultChat = document.getElementById('consultChat');
+    const testChat = document.getElementById('testChat');
     const mainInput = document.getElementById('mainInput');
     const sendButton = document.getElementById('sendButton');
     const progressBar = document.getElementById('progressBar');
     const modeBtns = document.querySelectorAll('.mode-btn');
+    const inputArea = document.getElementById('inputArea');
+    const testControls = document.getElementById('testControls');
+    const startTestBtn = document.getElementById('startTestBtn');
     
     // Переключение режимов
     modeBtns.forEach(btn => {
@@ -218,28 +232,33 @@
             btn.classList.add('active');
             currentMode = btn.dataset.mode;
             
-            // Сброс интерфейса
-            testSessionId = null;
-            progressBar.style.display = 'none';
-            mainInput.placeholder = currentMode === 'consult' 
-                ? 'Задайте вопрос...' 
-                : 'Нажмите "Начать тест"';
-            
             if (currentMode === 'consult') {
-                clearChat();
-                addBotMessage('Режим консультации. Задайте вопрос по учебнику.');
+                consultChat.style.display = 'block';
+                testChat.style.display = 'none';
+                inputArea.style.display = 'flex';
+                testControls.style.display = 'none';
+                progressBar.style.display = 'none';
+                mainInput.placeholder = 'Задайте вопрос...';
             } else {
-                clearChat();
-                showStartTestButton();
+                consultChat.style.display = 'none';
+                testChat.style.display = 'block';
+                inputArea.style.display = 'flex';
+                testControls.style.display = 'flex';
+                if (testSessionId) {
+                    mainInput.placeholder = 'Введите ответ...';
+                } else {
+                    mainInput.placeholder = 'Нажмите "Начать тест"';
+                }
             }
         });
     });
     
-    function clearChat() {
-        chatMessages.innerHTML = '';
+    function getCurrentChat() {
+        return currentMode === 'consult' ? consultChat : testChat;
     }
     
     function addMessage(text, sender, isLoading = false) {
+        const chat = getCurrentChat();
         const msgDiv = document.createElement('div');
         msgDiv.className = `message message-${sender}`;
         const bubble = document.createElement('div');
@@ -254,161 +273,38 @@
         timeDiv.textContent = new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
         msgDiv.appendChild(bubble);
         msgDiv.appendChild(timeDiv);
-        chatMessages.appendChild(msgDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+        chat.appendChild(msgDiv);
+        chat.scrollTop = chat.scrollHeight;
         return msgDiv;
     }
     
-    function addBotMessage(text) {
-        addMessage(text, 'bot');
-    }
-    
-    function addUserMessage(text) {
-        addMessage(text, 'user');
-    }
-    
-    function showStartTestButton() {
-        const container = document.createElement('div');
-        container.className = 'message message-bot';
-        container.innerHTML = `
-            <div class="message-bubble bot-bubble">
-                <p>Тестирование состоит из 5 вопросов по учебнику.</p>
-                <button class="restart-btn" onclick="startTest()">Начать тест</button>
-            </div>
-        `;
-        chatMessages.appendChild(container);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-        mainInput.disabled = true;
-        sendButton.disabled = true;
-    }
-    
-    async function startTest() {
-        setWaiting(true);
-        addBotMessage('Генерация вопросов...');
-        
-        try {
-            const response = await fetch('http://127.0.0.1:5000/test/start', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'}
-            });
-            const data = await response.json();
-            
-            if (data.error) {
-                addBotMessage(`Ошибка: ${data.error}`);
-                setWaiting(false);
-                return;
-            }
-            
-            testSessionId = data.session_id;
-            progressBar.style.display = 'block';
-            updateProgress(data.question_number, data.total_questions);
-            
-            clearChat();
-            addBotMessage(`Вопрос 1/${data.total_questions}:\n\n${data.question}`);
-            
-            mainInput.disabled = false;
-            sendButton.disabled = false;
-            mainInput.placeholder = 'Введите ответ...';
-            mainInput.value = '';
-            mainInput.focus();
-            
-        } catch (e) {
-            addBotMessage('Ошибка соединения с сервером');
-        }
-        setWaiting(false);
-    }
-    
-    async function submitAnswer(answer) {
-        if (!answer && answer !== '') return;
-        
-        setWaiting(true);
-        
-        try {
-            const response = await fetch('http://127.0.0.1:5000/test/answer', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    session_id: testSessionId,
-                    answer: answer
-                })
-            });
-            const data = await response.json();
-            
-            if (data.completed) {
-                // Тест завершён
-                progressBar.style.display = 'none';
-                clearChat();
-                addBotMessage(
-                    `Тест завершён!\n\n` +
-                    `Ваш результат: ${data.total_score.toFixed(2)} / ${data.max_score}\n` +
-                    `Процент: ${data.percentage}%\n\n` +
-                    `Последний ответ: ${data.feedback}\n` +
-                    `Эталон: ${data.expected}`
-                );
-                showRestartButton();
-                mainInput.disabled = true;
-                sendButton.disabled = true;
-            } else {
-                // Следующий вопрос
-                updateProgress(data.question_number, data.total_questions);
-                
-                // Показываем фидбек
-                const feedbackMsg = `Оценка: ${data.score.toFixed(2)} / 1.00\n${data.feedback}\n\nЭталон: ${data.expected}`;
-                addBotMessage(feedbackMsg);
-                
-                // Показываем следующий вопрос
-                addBotMessage(`Вопрос ${data.question_number}/${data.total_questions}:\n\n${data.question}`);
-                
-                mainInput.value = '';
-                mainInput.focus();
-            }
-        } catch (e) {
-            addBotMessage('Ошибка соединения');
-        }
-        setWaiting(false);
-    }
-    
-    function updateProgress(current, total) {
-        progressBar.textContent = `Вопрос ${current} из ${total}`;
-    }
-    
-    function showRestartButton() {
-        const container = document.createElement('div');
-        container.className = 'message message-bot';
-        container.innerHTML = `
-            <div class="message-bubble bot-bubble">
-                <button class="restart-btn" onclick="startTest()">Пройти тест заново</button>
-            </div>
-        `;
-        chatMessages.appendChild(container);
-    }
-    
-    async function askQuestion(question) {
-        if (!question) return;
-        
-        addUserMessage(question);
-        setWaiting(true);
-        
-        const loadingMsg = addMessage('', 'bot', true);
-        
-        try {
-            const response = await fetch('http://127.0.0.1:5000/ask', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({question})
-            });
-            const data = await response.json();
-            updateMessage(loadingMsg, data.answer, 'bot');
-        } catch (e) {
-            updateMessage(loadingMsg, 'Ошибка соединения', 'bot');
-        }
-        setWaiting(false);
-    }
-    
-    function updateMessage(el, text, sender) {
-        const bubble = el.querySelector('.message-bubble');
+    function addBotMessageWithCopy(text, copyText) {
+        const chat = getCurrentChat();
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'message message-bot';
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble bot-bubble';
         bubble.textContent = text;
-        bubble.className = `message-bubble ${sender}-bubble`;
+        
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'copy-btn';
+        copyBtn.textContent = 'Скопировать';
+        copyBtn.onclick = () => {
+            navigator.clipboard.writeText(copyText);
+            copyBtn.textContent = 'Скопировано!';
+            setTimeout(() => { copyBtn.textContent = 'Скопировать'; }, 2000);
+        };
+        bubble.appendChild(document.createElement('br'));
+        bubble.appendChild(copyBtn);
+        
+        const timeDiv = document.createElement('div');
+        timeDiv.className = 'message-time';
+        timeDiv.textContent = new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
+        msgDiv.appendChild(bubble);
+        msgDiv.appendChild(timeDiv);
+        chat.appendChild(msgDiv);
+        chat.scrollTop = chat.scrollHeight;
+        return msgDiv;
     }
     
     function setWaiting(waiting) {
@@ -417,29 +313,116 @@
         sendButton.disabled = waiting;
     }
     
-    // Обработчики отправки
+    // Консультация
+    async function askQuestion(question) {
+        if (!question) return;
+        addMessage(question, 'user');
+        setWaiting(true);
+        const loadingMsg = addMessage('', 'bot', true);
+        try {
+            const response = await fetch('http://127.0.0.1:5000/ask', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({question})
+            });
+            const data = await response.json();
+            loadingMsg.querySelector('.message-bubble').textContent = data.answer;
+            loadingMsg.querySelector('.message-bubble').className = 'message-bubble bot-bubble';
+        } catch (e) {
+            loadingMsg.querySelector('.message-bubble').textContent = 'Ошибка соединения';
+        }
+        setWaiting(false);
+    }
+    
+    // Тестирование
+    async function startTest() {
+        setWaiting(true);
+        addMessage('Генерация вопросов...', 'bot');
+        try {
+            const response = await fetch('http://127.0.0.1:5000/test/start', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+            const data = await response.json();
+            if (data.error) {
+                addMessage(`Ошибка: ${data.error}`, 'bot');
+                setWaiting(false);
+                return;
+            }
+            testSessionId = data.session_id;
+            progressBar.style.display = 'block';
+            progressBar.textContent = `Вопрос ${data.question_number}/${data.total_questions}`;
+            
+            addMessage(`Вопрос ${data.question_number}/${data.total_questions}:`, 'bot');
+            addBotMessageWithCopy(data.question, data.question);
+            
+            mainInput.placeholder = 'Введите ответ...';
+            mainInput.value = '';
+            mainInput.focus();
+        } catch (e) {
+            addMessage('Ошибка соединения', 'bot');
+        }
+        setWaiting(false);
+    }
+    
+    async function submitAnswer(answer) {
+        if (!answer && answer !== '') return;
+        addMessage(answer, 'user');
+        setWaiting(true);
+        try {
+            const response = await fetch('http://127.0.0.1:5000/test/answer', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({session_id: testSessionId, answer})
+            });
+            const data = await response.json();
+            
+            if (data.completed) {
+                progressBar.style.display = 'none';
+                testSessionId = null;
+                addMessage(`Тест завершён! Результат: ${data.total_score.toFixed(2)}/${data.max_score} (${data.percentage}%)`, 'bot');
+                addMessage(`Последний ответ: ${data.feedback}\nЭталон: ${data.expected}`, 'bot');
+                mainInput.placeholder = 'Нажмите "Начать тест"';
+                mainInput.value = '';
+            } else {
+                progressBar.textContent = `Вопрос ${data.question_number}/${data.total_questions}`;
+                addMessage(`Оценка: ${data.score.toFixed(2)}/1.00 — ${data.feedback}`, 'bot');
+                addMessage(`Эталон: ${data.expected}`, 'bot');
+                
+                addMessage(`Вопрос ${data.question_number}/${data.total_questions}:`, 'bot');
+                addBotMessageWithCopy(data.question, data.question);
+                
+                mainInput.value = '';
+                mainInput.focus();
+            }
+        } catch (e) {
+            addMessage('Ошибка соединения', 'bot');
+        }
+        setWaiting(false);
+    }
+    
+    // Отправка
     sendButton.addEventListener('click', () => {
         const value = mainInput.value.trim();
         if (!value || isWaiting) return;
+        mainInput.value = '';
         
         if (currentMode === 'consult') {
-            mainInput.value = '';
             askQuestion(value);
         } else {
-            mainInput.value = '';
-            addUserMessage(value);
+            if (!testSessionId) {
+                addMessage('Нажмите "Начать тест" сначала', 'bot');
+                return;
+            }
             submitAnswer(value);
         }
     });
     
     mainInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            sendButton.click();
-        }
+        if (e.key === 'Enter') sendButton.click();
     });
     
-    // Глобальные функции для кнопок
-    window.startTest = startTest;
+    startTestBtn.addEventListener('click', startTest);
 </script>
 </body>
 </html>
